@@ -171,6 +171,9 @@ func StartGenPieceCommitmentTask() error {
 				defer fi.Close()
 				bf := bufio.NewReader(fi)
 				carSize := bf.Size()
+
+				log.Infof("generatePieceCommitment start. miner: %s proofType: %d sectorSize: %d car: %s", deal.Miner, deal.ProofType, carSize, deal.Car)
+
 				pieceCid, perr := generatePieceCommitment(deal.ProofType, fi, uint64(carSize))
 				defer func() {
 					if ok, err := inited.Redis.Unlock(deal.ProposalCid); err != nil || !ok {
