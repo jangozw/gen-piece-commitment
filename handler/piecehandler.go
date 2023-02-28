@@ -111,15 +111,15 @@ func ImportDeal(minerID, importFile string) error {
 		lineNo := totalNum
 		pool.Submit(func() {
 			if err := dbHandler.ImportDeal(proposalCid, car, miner, minerPt); err != nil {
-				log.Errorf("Import deal failed: %v proposal_cid: %v", err.Error(), proposalCid)
+				log.Errorf("Import deal line %d failed: %v proposal_cid: %v", lineNo, err.Error(), proposalCid)
 				return
 			}
 			succNum.Add(1)
-			log.Infof("import success! line: %d proposal_cid: %v", lineNo, proposalCid)
+			log.Infof("import deal line %d success. proposal_cid: %v", lineNo, proposalCid)
 		})
 	}
 	pool.StopWait()
-	log.Infof("Imort deal by %s end. total: %d succ: %d", importFile, totalNum, succNum.Load())
+	log.Infof("Import deal by %s end. total: %d succ: %d", importFile, totalNum, succNum.Load())
 	return nil
 }
 
