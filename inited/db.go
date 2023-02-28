@@ -47,6 +47,7 @@ func InitDB(host, user, pwd, dbName string) {
 	})
 	// sql 写入日志 或控制台， 二选一
 	db.SetLogger(mysqlLog)
+	db.CreateTable(&model.TDealInfo{})
 	db.Set("gorm:table_options", "ENGINE=InnoDB AUTO_INCREMENT=1 DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci").AutoMigrate(&model.TDealInfo{})
 	DB = db
 	return

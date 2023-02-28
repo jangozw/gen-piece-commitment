@@ -13,11 +13,11 @@ type Model struct {
 
 type TDealInfo struct {
 	ID          uint64                  `gorm:"column:id;AUTO_INCREMENT;not null"`
-	ProposalCid string                  `gorm:"column:proposal_cid;type:varchar(128);not null;default:''"` // 矿工号id, f01234
-	ProofType   abi.RegisteredSealProof `gorm:"column:proof_type;type:int;not null;default:0"`             // 扇区id
-	Miner       string                  `gorm:"column:miner;type:varchar(32);not null;default:''"`         // c1 md5
-	PieceCid    string                  `gorm:"column:piece_cid;type:varchar(128);not null;default:''"`    // c1结果: base64UrlEncodeBytesToString
-	Car         string                  `gorm:"column:car;type:varchar(256);not null;default:''"`          // c2证明结果
-	Verified    bool                    `gorm:"column:verified;type:int;not null;default:0"`               // c2证明结果
+	ProposalCid string                  `gorm:"column:proposal_cid;unique_index:pcid;type:varchar(128);not null;default:''"` // 交易id
+	ProofType   abi.RegisteredSealProof `gorm:"column:proof_type;type:int;not null;default:0"`                               // 密封类型
+	Miner       string                  `gorm:"column:miner;type:varchar(32);not null;default:''"`                           // miner id
+	PieceCid    string                  `gorm:"column:piece_cid;type:varchar(128);not null;default:''"`                      // 根据car路径计算出piece cid
+	Car         string                  `gorm:"column:car;type:varchar(256);not null;default:''"`                            // car路径
+	Verified    bool                    `gorm:"column:verified;type:int;not null;default:0"`                                 // 是否是已验证交易
 	Model
 }

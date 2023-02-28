@@ -11,4 +11,4 @@ db=0
 poolsize=100
 
 [log]
-levels=[{ name = "inited", level = "info" },{ name = "handler", level = "debug" }]
+levels=[{ name = "inited", level = "debug" },{ name = "handler", level = "debug" }]
