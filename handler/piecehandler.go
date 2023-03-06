@@ -3,13 +3,13 @@ package handler
 import (
 	"bufio"
 	"gen-piece-commitment/inited"
+	"gen-piece-commitment/model"
 	"gen-piece-commitment/util"
 	"github.com/filecoin-project/go-commp-utils/ffiwrapper"
 	"github.com/filecoin-project/go-padreader"
 	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/gammazero/workerpool"
 	"github.com/ipfs/go-cid"
-	"github.com/pkg/errors"
 	"io"
 	"os"
 	"strconv"
@@ -19,7 +19,21 @@ import (
 	"time"
 )
 
+const (
+	StorageCarPathPrefix = "/Volumes/new-apfs/devnet/deals-data/car" // todo modify
+)
+
 var minerProofTypes sync.Map
+
+func GetCarReader(path string) (io.Reader, error) {
+
+	if strings.HasPrefix("http", path) {
+
+	} else if strings.HasPrefix("/", path) {
+
+	}
+	return nil, nil
+}
 
 func ImportDeal(minerID, importFile string) error {
 	file, err := os.Open(importFile)
@@ -28,7 +42,7 @@ func ImportDeal(minerID, importFile string) error {
 	}
 
 	defer file.Close()
-	pool := workerpool.New(1000)
+	pool := workerpool.New(100)
 	dbHandler := NewDBHandler()
 	bf := bufio.NewReader(file)
 	totalNum := -1
@@ -56,7 +70,8 @@ func ImportDeal(minerID, importFile string) error {
 	if minerID != "" {
 		pt, err := getProofType(minerID, 0)
 		if err != nil || pt == 0 {
-			return errors.Errorf("getProofType of miner (%s) failed: %v", minerID, err)
+			log.Errorf("getProofType of miner (%s) failed: %v", minerID, err)
+			return nil
 		}
 		proofType = pt
 	}
@@ -124,7 +139,7 @@ func ImportDeal(minerID, importFile string) error {
 }
 
 func StartGenPieceCommitmentTask() error {
-	pool := workerpool.New(10)
+	pool := workerpool.New(100)
 	dbHandler := NewDBHandler()
 	for {
 		deals, err := dbHandler.GetUncheckDeals(10)
@@ -137,7 +152,9 @@ func StartGenPieceCommitmentTask() error {
 			time.Sleep(1 * time.Second)
 			continue
 		}
-		for _, deal := range deals {
+		for _, dl := range deals {
+			deal := dl
+			// todo remove
 			ok, err := inited.Redis.Lock(deal.ProposalCid, 1, time.Second*3600)
 			if err != nil {
 				log.Errorf("redis lock proposalCid: %v err: %v", deal.ProposalCid, err)
@@ -146,40 +163,38 @@ func StartGenPieceCommitmentTask() error {
 				log.Warnf("skip redis lock current proposalCid: %v failed. myabe other thread doing", deal.ProposalCid)
 				continue
 			}
+			dbHandler.UpdateDealState(deal.ProposalCid, model.DealCheckStateGeneratingCid)
+			carPath := StorageCarPathPrefix + "/" + deal.Car
+
 			pool.Submit(func() {
-				if ok, err := util.IsPathExists(deal.Car); err != nil {
-					log.Errorf("check path %v exists failed! dealID: %v err: %v", deal.Car, deal.ProposalCid, err.Error())
+				var taskSucc bool
+				defer func() {
+					inited.Redis.Unlock(deal.ProposalCid)
+					if !taskSucc {
+						dbHandler.UpdateDealState(deal.ProposalCid, model.DealCheckStateGenerateCidFailed)
+					}
+				}()
+				if ok, err := util.IsPathExists(carPath); err != nil {
+					log.Errorf("check path %v exists failed! dealID: %v err: %v", carPath, deal.ProposalCid, err.Error())
 					return
 				} else if !ok {
-					log.Errorf("check file not exist: %v dealID: %v", deal.Car, deal.ProposalCid)
+					log.Errorf("check file not exist: %v dealID: %v", carPath, deal.ProposalCid)
 					return
 				}
-				/*			bytes, err := os.ReadFile(deal.Car)
-							if err != nil {
-								log.Errorf("get file %v size is err: %v ", deal.Car, err.Error())
-								return
-							}
-							if len(bytes) == 0 {
-								log.Errorf("deal car file %v bytes is 0", deal.Car)
-								return
-							}*/
-				fi, err := os.Open(deal.Car)
+				sf, err := os.Stat(carPath)
 				if err != nil {
-					log.Errorf("open %v err: %v", deal.Car, err.Error())
+					log.Errorf("stat file  %v err: %v ", carPath, err)
+					return
+				}
+				carSize := sf.Size()
+				fi, err := os.Open(carPath)
+				if err != nil {
+					log.Errorf("open %v err: %v", carPath, err.Error())
 					return
 				}
 				defer fi.Close()
-				bf := bufio.NewReader(fi)
-				carSize := bf.Size()
-
-				log.Infof("generatePieceCommitment start. miner: %s proofType: %d sectorSize: %d car: %s", deal.Miner, deal.ProofType, carSize, deal.Car)
-
+				log.Infof("generatePieceCommitment start. miner: %s proofType: %d sectorSize: %d car: %s", deal.Miner, deal.ProofType, carSize, carPath)
 				pieceCid, perr := generatePieceCommitment(deal.ProofType, fi, uint64(carSize))
-				defer func() {
-					if ok, err := inited.Redis.Unlock(deal.ProposalCid); err != nil || !ok {
-						log.Errorf("redis unlock deal %v failed. %v %v", deal.ProposalCid, ok, err)
-					}
-				}()
 				if perr != nil {
 					log.Errorf("generatePieceCommitment failed dealID: %v err: %v", deal.ProposalCid, perr.Error())
 					return
@@ -189,6 +204,7 @@ func StartGenPieceCommitmentTask() error {
 					log.Errorf("updatePieceCid failed dealID: %v err: %v", deal.ProposalCid, err.Error())
 					return
 				}
+				taskSucc = true
 			})
 		}
 	}

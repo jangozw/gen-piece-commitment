@@ -46,7 +46,6 @@ func InitConfig(cf string) {
 		panic(err)
 	}
 	Cfg = cg
-	fmt.Printf("config: %+v\n", Cfg)
 	return
 }
 

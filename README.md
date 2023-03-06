@@ -2,6 +2,8 @@
 
 用来辅助lotus-miner接收deal的验证环节, 将lotus-miner import-data 中的生产piece cid 独立部署,减轻miner负载
 
+将本程序部署在任意机器，只要能连接配置文件里的数据库等信息即可。lotus-miner根据数据库记录的结果进行下一步工作
+
 ## 编译
 
 ```shell

@@ -29,7 +29,7 @@ func NewDBHandler() *DBHandler {
 }
 func (s *DBHandler) GetUncheckDeals(num int) ([]Deal, error) {
 	var deals []model.TDealInfo
-	query := s.Db.Model(&model.TDealInfo{}).Where("piece_cid = ''").Order("id asc").Limit(num).Find(&deals)
+	query := s.Db.Model(&model.TDealInfo{}).Where("check_state = ?", model.DealCheckStateWait).Order("id asc").Limit(num).Find(&deals)
 	if err := query.Error; err != nil {
 		return nil, err
 	}
@@ -47,8 +47,16 @@ func (s *DBHandler) GetUncheckDeals(num int) ([]Deal, error) {
 
 func (s *DBHandler) UpdatePieceCid(proposalCID, pieceCid string) error {
 	return s.Db.Model(&model.TDealInfo{}).Where("proposal_cid =?", proposalCID).Update(map[string]interface{}{
-		"piece_cid": pieceCid,
+		"piece_cid":   pieceCid,
+		"check_state": model.DealCheckStateGeneratedCid,
 	}).Error
+}
+
+func (s *DBHandler) UpdateDealState(proposalCid string, state model.DealCheckState) error {
+	update := map[string]interface{}{
+		"check_state": state,
+	}
+	return s.Db.Model(&model.TDealInfo{}).Where("proposal_cid=?", proposalCid).Update(update).Error
 }
 
 func (s *DBHandler) ImportDeal(proposalCid string, car string, miner string, proofType abi.RegisteredSealProof) error {
@@ -61,6 +69,11 @@ func (s *DBHandler) ImportDeal(proposalCid string, car string, miner string, pro
 	if err := s.Db.Model(&model.TDealInfo{}).Where("proposal_cid=?", proposalCid).First(&data).Error; err != nil && err != gorm.ErrRecordNotFound {
 		return err
 	}
+	if data.ID > 0 && data.PieceCid != "" {
+		return nil
+		//return errors.("Skip this deal areadly generated pieceCid")
+	}
+
 	if data.ID > 0 {
 		update := map[string]interface{}{
 			"proposal_cid": proposalCid,
